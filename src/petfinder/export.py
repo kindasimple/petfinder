@@ -4,14 +4,12 @@
 
 python -m petfinder.export --exclude "English Bulldog" search
 """
-from typing import List, Dict, Any
-from pathlib import Path
 import argparse
-from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from petfinder.client import ApiClient, API_KEY, API_SECRET
-from petfinder.cache import Cache, Archive, QueryParams
-from petfinder.types import QueryParams
+from petfinder.cache import Archive, Cache, QueryParams
+from petfinder.client import API_KEY, API_SECRET, ApiClient
 
 DEFAULT_LOCATION = "San Francisco, CA"
 DEFAULT_DISTANCE = 10
@@ -24,13 +22,15 @@ ARCHIVE_PATH = Path("./archive")
 class ApiClientLocalFSCache(Archive, Cache, ApiClient):
     def __init__(
         self,
-        api_secret: str,
-        api_key: str,
+        api_secret: Optional[str],
+        api_key: Optional[str],
         query: QueryParams,
-        cache_dir: Path = DATA_PATH,
-        archive_dir: Path = ARCHIVE_PATH,
+        cache_dir: str = DATA_PATH.as_posix(),
+        archive_dir: str = ARCHIVE_PATH.as_posix(),
         fetch: bool = True,
     ) -> None:
+        if not api_secret or not api_key:
+            raise RuntimeError("API key and secret are required")
         if cache_dir:
             Cache.__init__(self, cache_dir, query)
         if archive_dir:
@@ -67,7 +67,7 @@ class ApiClientLocalFSCache(Archive, Cache, ApiClient):
         cache_breed_file = (
             Path(animal_type) / breed.replace("/", "") / self.ANIMALS_CACHE_FILENAME
         )
-        cache_id = self.get_query_hash(*args, **kwargs)
+        self.get_query_hash(*args, **kwargs)
         animals = self._get_cache_file(str(cache_breed_file))
         if animals is not None:
             return animals
@@ -86,20 +86,19 @@ class ApiClientLocalFSCache(Archive, Cache, ApiClient):
         cache_breed_file = (
             Path(animal_type) / breed.replace("/", "") / self.ANIMALS_CACHE_FILENAME
         )
-        cache_id = self.get_query_hash(*args, **kwargs)
         animals = self._get_cache_file(str(cache_breed_file))
 
         # get archive file
-        previous_animals = self._get_archive_file(str(cache_breed_file))
-        previous_animals = (
-            set(map(lambda animal: animal["id"], previous_animals))
-            if previous_animals
+        archived_animals = self._get_archive_file(str(cache_breed_file))
+        seen_animal_set = (
+            set(map(lambda animal: animal["id"], archived_animals))
+            if archived_animals
             else set()
         )
         if animals is not None:
             # return animals
             return list(
-                filter(lambda animal: animal["id"] not in previous_animals, animals)
+                filter(lambda animal: animal["id"] not in seen_animal_set, animals)
             )
 
         if not self._fetch:
@@ -107,7 +106,7 @@ class ApiClientLocalFSCache(Archive, Cache, ApiClient):
 
         # request data from api
         animals = super().search(animal_type, breed, *args, **kwargs)
-        self._save_cache_file(str(cache_breed_file), animals, cache_id=cache_id)
+        self._save_cache_file(str(cache_breed_file), animals)
 
 
 def main(query: QueryParams, action: str, exclude_breeds: List[str]):
@@ -118,10 +117,18 @@ def main(query: QueryParams, action: str, exclude_breeds: List[str]):
             )
         )
     elif action == "search":
-        client = ApiClientLocalFSCache(API_SECRET, API_KEY, query, DATA_PATH)
+        client = ApiClientLocalFSCache(API_SECRET, API_KEY, query, DATA_PATH.as_posix())
         query_hash = ApiClientLocalFSCache.get_query_hash(
             location=query.location, distance=query.distance, limit=query.limit
         )
+        # remove symlink if exists
+        try:
+            Path(DATA_PATH / query_hash).unlink(missing_ok=True)
+        except PermissionError:
+            print(
+                f"PermissionError: Unable to remove symlink {DATA_PATH / query_hash}."
+            )
+
         if not client.current_cache_dir.exists():
             # the archived cache might not exist, but might have cached the data locally
             # in ./data
@@ -140,19 +147,15 @@ def main(query: QueryParams, action: str, exclude_breeds: List[str]):
             client.archive(client.cache_dir)
             # client.current_cache_dir.mkdir(parents=True)
         else:
-            print(f"Cache directory {client.current_cache_dir} already exists in archive. Skipping search.")
-            # remove symlink if exists
-            try:
-                Path(DATA_PATH / query_hash).unlink(missing_ok=True)
-            except PermissionError:
-                print(
-                    f"PermissionError: Unable to remove symlink {DATA_PATH / query_hash}."
-                )
-            finally:
-                # create symlink to archive folder
-                Path(DATA_PATH / query_hash).symlink_to(
-                    client.current_cache_dir.resolve(), target_is_directory=True
-                )
+            print(
+                f"Cache directory {client.current_cache_dir} already exists in archive."
+                "Skipping search."
+            )
+
+        # create symlink to archive folder
+        Path(DATA_PATH / query_hash).symlink_to(
+            client.current_cache_dir.resolve(), target_is_directory=True
+        )
 
 
 if __name__ == "__main__":
@@ -171,7 +174,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     exclude_breeds = args.exclude
     action = args.action
-    query = QueryParams(location=args.location, distance=args.distance, limit=args.limit)
+    query = QueryParams(
+        location=args.location, distance=args.distance, limit=args.limit
+    )
 
     print(f"Running petfinder action {action} with params: {args}")
     main(query, action, exclude_breeds)

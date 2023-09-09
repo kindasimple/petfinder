@@ -56,6 +56,39 @@ python -m src.petfinder.api
 open http://127.0.0.1:8000/static/index.html
 ```
 
+Get updated animals
+```
+python
+
+import os
+from src.petfinder.export import ApiClientLocalFSCache
+from src.petfinder.types import QueryParams
+
+from pathlib import Path
+query = QueryParams(location="San Francisco, CA", distance=10, limit=100)
+client = ApiClientLocalFSCache(
+        os.environ["PF_API_SECRET"],
+        os.environ["PF_API_KEY"],
+        query,
+        cache_dir="./data",
+        archive_dir="./archive",
+        fetch=False,
+    )
+animal_type = "dog"
+breeds = client.get_dog_breed(exclude_breeds=[])
+list(map(lambda a: a["name"], breeds))
+
+> ['Affenpinscher', 'Afghan Hound', 'Airedale Terrier', 'Akbash', 'Akita', 'Alaskan Malamute', 'American Bulldog', ...]
+
+breed = "Beagle"
+animals = client.updates(
+    animal_type, breed, location="San Francisco, CA", distance=10, limit=100
+)
+list(map(lambda a: (a["name"], a["url"]), animals))
+
+> [('Chloe Elizabeth 11074', 'https://www.petfinder.com/dog/chloe-elizabeth-11074-68787731/ca/san-francisco/muttville-senior-dog-rescue-ca1287/?referrer_id=e67817be-12d8-4e52-a7f2-86cedbeb08e4&utm_source=api&utm_medium=partnership&utm_content=e67817be-12d8-4e52-a7f2-86cedbeb08e4')]
+```
+
 ## Overview
 
 Use the petfinder api to download the pets for a query and then present a web UI for fast browsing.

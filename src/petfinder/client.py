@@ -1,9 +1,8 @@
-import requests
-from urllib.parse import urljoin
-from typing import List, Dict, Any
 import os
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urljoin
 
-print(os.getenv("PF_API_KEY"))
+import requests
 
 API_KEY = os.getenv("PF_API_KEY")
 API_SECRET = os.getenv("PF_API_SECRET")
@@ -16,7 +15,13 @@ class ApiClient:
     _animal_route = "animals"
     _type_dog_breed = "types/dog/breeds"
 
-    def __init__(self, api_secret: str = API_SECRET, api_key: str = API_KEY) -> None:
+    def __init__(
+        self, api_secret: Optional[str] = API_SECRET, api_key: Optional[str] = API_KEY
+    ) -> None:
+
+        if not api_secret or not api_key:
+            raise RuntimeError("API key and secret are required")
+
         self._api_secret = api_secret
         self._api_key = api_key
 
@@ -30,7 +35,11 @@ class ApiClient:
             "client_id": self._api_key,
             "client_secret": self._api_secret,
         }
-        response = requests.post(request_url, json=request_json, timeout=30, )
+        response = requests.post(
+            request_url,
+            json=request_json,
+            timeout=30,
+        )
         self._token = response.json()["access_token"]
         self._session = requests.Session()
         header_dict = {
@@ -56,15 +65,16 @@ class ApiClient:
         :param limit: The maximum number of results to return
         :return: A dictionary of results
         """
+        params: Dict[str, Union[str, int]] = {
+            "type": animal_type,
+            "breed": breed,
+            "location": location,
+            "distance": distance,
+            "limit": limit,
+        }
         response = self._session.get(
             urljoin(self._api_url, self._animal_route),
-            params={
-                "type": animal_type,
-                "breed": breed,
-                "location": location,
-                "distance": distance,
-                "limit": limit,
-            },
+            params=params,
         )
         return response.json()["animals"]
 

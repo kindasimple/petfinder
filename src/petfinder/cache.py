@@ -1,15 +1,17 @@
 import hashlib
 import json
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+
 from petfinder.types import QueryParams
-from datetime import datetime
-import shutil
 
 
 class Archive:
     """
     Get archive api data from local file system"""
+
     ANIMALS_CACHE_FILENAME = "animals.json"
     DOG_BREEDS_CACHE_FILENAME = "breeds.json"
 
@@ -33,6 +35,7 @@ class Archive:
                 # If cache data filepath exists, load cache data from file
                 with open(cache_data_filepath, "r", encoding="utf8") as f:
                     return json.loads(f.read())
+        return []
 
     def archive(self, src: str):
         """Archive api data to local file system"""
@@ -55,9 +58,7 @@ class Cache:
     def cache_dir(self):
         return self._cache_dir / self.cache_id
 
-    def _get_cache_file(
-        self, cache_filepath: str
-    ) -> List[Dict[str, Any]]:
+    def _get_cache_file(self, cache_filepath: str) -> List[Dict[str, Any]]:
         """Get data from cache file"""
         if self._cache_dir.exists():
             cache_data_filepath = self.cache_dir / cache_filepath
@@ -68,10 +69,9 @@ class Cache:
                 print(f"Cache file {cache_data_filepath} does not exist")
         else:
             print(f"Cache directory {self._cache_dir} does not exist")
+        return []
 
-    def _save_cache_file(
-        self, cache_filepath: str, data: Dict[str, Any]
-    ) -> None:
+    def _save_cache_file(self, cache_filepath: str, data: List[Dict[str, Any]]) -> None:
         """"""
         if self.cache_dir.exists():
             self.cache_dir.mkdir(
