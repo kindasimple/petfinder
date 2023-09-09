@@ -77,7 +77,7 @@ class ApiClientLocalFSCache(Archive, Cache, ApiClient):
 
         # request data from api
         animals = super().search(animal_type, breed, *args, **kwargs)
-        self._save_cache_file(cache_breed_file, animals, cache_id=cache_id)
+        self._save_cache_file(cache_breed_file, animals)
         return animals
 
     def updates(
