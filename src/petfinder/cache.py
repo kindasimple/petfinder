@@ -3,7 +3,7 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from petfinder.types import QueryParams
 
@@ -58,7 +58,7 @@ class Cache:
     def cache_dir(self):
         return self._cache_dir / self.cache_id
 
-    def _get_cache_file(self, cache_filepath: str) -> List[Dict[str, Any]]:
+    def _get_cache_file(self, cache_filepath: str) -> Union[None, List[Dict[str, Any]]]:
         """Get data from cache file"""
         if self._cache_dir.exists():
             cache_data_filepath = self.cache_dir / cache_filepath
@@ -69,7 +69,7 @@ class Cache:
                 print(f"Cache file {cache_data_filepath} does not exist")
         else:
             print(f"Cache directory {self._cache_dir} does not exist")
-        return []
+        return None
 
     def _save_cache_file(self, cache_filepath: str, data: List[Dict[str, Any]]) -> None:
         """"""
